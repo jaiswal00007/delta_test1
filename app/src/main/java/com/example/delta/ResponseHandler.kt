@@ -2,6 +2,10 @@ package com.example.delta
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 class ResponseHandler(private val context: Context) {
@@ -18,6 +22,30 @@ class ResponseHandler(private val context: Context) {
         "Hey there! Got any questions?",
         "Hiya! I'm here to assist you anytime!"
     )
+    val aboutBotResponses = listOf(
+        "I'm Delta, your personal AI assistant 🤖. I'm here to help you with anything you need!",
+        "Hey! I'm Delta, your virtual buddy built to make your life easier 💡",
+        "I'm Delta, your Android AI assistant! Ask me anything — I'm listening 👂",
+        "Delta at your service! I can open apps, set alarms, answer questions, and more 📱",
+        "Hi, I’m Delta — your smart assistant. I'm always here to help you out 💬",
+        "I'm an AI created to assist you with your daily tasks. Just say the word! 🧠",
+        "Call me Delta! I'm an Android-based assistant designed to simplify your life 📲",
+        "Nice to meet you! I’m Delta, your AI-powered assistant and digital helper 🤝",
+        "I’m Delta, your personal assistant designed to respond, react, and assist 🚀",
+        "Delta here 👋 I’m trained to handle commands and give you quick results!"
+    )
+    val developedByResponses = listOf(
+        "I was developed by Anshu Jaiswal 🧠💻",
+        "Proudly created by Anshu Jaiswal 🙌",
+        "Anshu Jaiswal is the mind behind my existence 🤖✨",
+        "Powered and developed by the one and only Anshu Jaiswal 🚀",
+        "Brought to life by Anshu Jaiswal, with code and care ❤️",
+        "Crafted with dedication by Anshu Jaiswal 🔧🧠",
+        "Made possible thanks to the hard work of Anshu Jaiswal 💪",
+        "Anshu Jaiswal developed me to assist you better every day 👨‍💻"
+    )
+
+
 
 
     fun detectIntent(userInput: String): String {
@@ -57,7 +85,7 @@ class ResponseHandler(private val context: Context) {
                 "disable flashlight",
                 "flashlight off"
             ),
-            "greet" to listOf("hi", "hello", "hey", "wassup"),
+            "greet" to listOf("hi", "hello", "hey", "wassup","hyy","hy","hii","hlo"),
             "set_alarm" to listOf("set an alarm", "create an alarm", "schedule an alarm"),
             "stop_alarm" to listOf("stop alarm", "turn off alarm", "disable alarm"),
             "about_bot" to listOf("who are you", "what is your name", "introduce yourself"),
@@ -106,58 +134,48 @@ class ResponseHandler(private val context: Context) {
 
     }
 
-    fun getResponse(query: String): String {
+    fun getResponse(query: String, callback: (String) -> Unit) {
         val currentIntent = detectIntent(query)
+
         if (currentIntent.isNotEmpty()) {
-            if (currentIntent == "greet") {
-                return greetResponses[Random.nextInt(0, greetResponses.count())]
-            }
-            else if(currentIntent == "youtube"){
-                return "Opening YouTube"
-            }
-            else if(currentIntent == "instagram"){
-                return "Opening Instagram"
-            }
-            else if(currentIntent == "whatsapp"){
-                return "Opening WhatsApp"
-            }
-            else if(currentIntent == "facebook"){
-                return "Opening Facebook"
-            }
-            else if(currentIntent == "twitter"){
-                return "Opening Twitter"
-            }
-            else if(currentIntent == "snapchat"){
-                return "Opening Snapchat"
-            }
-            else if(currentIntent == "spotify"){
-                return "Opening Spotify"
-            }
-            else if(currentIntent == "chrome"){
-                return "Opening Chrome"
-            }
-            else if(currentIntent == "gmail"){
-                return "Opening Gmail"
-            }
-            else if(currentIntent == "flashlight_on"){
-                return "Turning on the flashlight"
-            }
-            else if(currentIntent == "flashlight_off") {
-                return "Turning off the flashlight"
-            }
-            else if(currentIntent == "navigation"){
-                return "Opening Google Maps"
-            }
-            else if(currentIntent == "music_control") {
-                return "Controlling music playback"
-            }
+            when (currentIntent) {
+                "about_bot" -> callback(aboutBotResponses.random())
+                "developed_by" -> callback(developedByResponses.random())
+                "greet" -> callback(greetResponses.random())
 
+                "youtube", "instagram", "whatsapp", "facebook", "twitter", "snapchat",
+                "spotify", "chrome", "gmail" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(1500) // wait 1.5 seconds
+                        functionality.open_app(currentIntent)
+                    }
+                    callback("Opening ${currentIntent.replaceFirstChar { it.uppercase() }}...")
+                }
 
+                "flashlight_on" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(1500) // wait 1.5 seconds
+                        functionality.toggleFlashlight(true)
+                    }
+                    callback("Turning on the flashlight")
+                }
 
+                "flashlight_off" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(1500) // wait 1.5 seconds
+                        functionality.toggleFlashlight(false)
+                        callback("Turning off the flashlight")
+                    }
+                }
+                "navigation" -> callback("Opening Google Maps")
+                "music_control" -> callback("Controlling music playback")
+                else -> callback("Sorry, I couldn't understand that.")
+            }
+        } else {
+            callback("Invalid Response")
         }
-
-        return "Invalid Response"
     }
+
 
 
 

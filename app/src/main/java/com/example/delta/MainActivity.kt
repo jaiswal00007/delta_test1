@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColor
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -64,6 +66,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -72,6 +75,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.delta.ui.theme.botBubbleColor
+import com.example.delta.ui.theme.botTextColor
 import com.example.delta.ui.theme.color1
 import com.example.delta.ui.theme.color2
 import com.example.delta.ui.theme.color3
@@ -79,6 +84,8 @@ import com.example.delta.ui.theme.color4
 import com.example.delta.ui.theme.sapAssistantBg
 import com.example.delta.ui.theme.sapPrimary
 import com.example.delta.ui.theme.sapUserText
+import com.example.delta.ui.theme.userBubbleColor
+import com.example.delta.ui.theme.userTextColor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -92,14 +99,15 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
 
     val geminiHelper = GeminiHelper()
+
     override fun onCreate(savedInstanceState: Bundle?) {
 
-
+        val response = ResponseHandler(this)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
 
-            ChatScreen(geminiHelper)
+            ChatScreen(geminiHelper,response)
 
         }
 
@@ -110,14 +118,20 @@ class MainActivity : ComponentActivity() {
 
 }
 @Composable
-fun ChatScreen(geminiHelper: GeminiHelper) {
+fun ChatScreen(geminiHelper: GeminiHelper, response: ResponseHandler) {
     var messages by remember { mutableStateOf(listOf<Pair<ChatMessage, String>>()) }
     var currentMessage by remember { mutableStateOf("") }
     var isTyping by remember { mutableStateOf(false) }
     var isFirstMessage by remember { mutableStateOf(true) }
     val keyboardController = LocalSoftwareKeyboardController.current
     var showButtons by remember { mutableStateOf(true) }
+    val listState = rememberLazyListState()
 
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
     fun sendMessage(message: String) {
         if (message.isNotEmpty()) {
             val timestamp = getCurrentTime()
@@ -128,12 +142,25 @@ fun ChatScreen(geminiHelper: GeminiHelper) {
             keyboardController?.hide()
             showButtons = false
 
-            geminiHelper.getGeminiResponse(message) { response ->
-                Log.d("ChatScreen", "Gemini response received: $response")
+            response.getResponse(message) { botReply ->
                 val botTimestamp = getCurrentTime()
-                messages = messages + (ChatMessage(response, false) to botTimestamp)
-                isTyping = false
+
+                CoroutineScope(Dispatchers.Main).launch {
+                    delay(2000)
+                    messages = messages + (ChatMessage(botReply, false) to botTimestamp)
+                    isTyping = false
+                }
             }
+
+
+
+
+//            geminiHelper.getGeminiResponse(message) { response ->
+//                Log.d("ChatScreen", "Gemini response received: $response")
+//                val botTimestamp = getCurrentTime()
+//                messages = messages + (ChatMessage(response, false) to botTimestamp)
+//                isTyping = false
+//            }
         }
     }
 
@@ -154,12 +181,14 @@ fun ChatScreen(geminiHelper: GeminiHelper) {
             }
 
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 reverseLayout = false
-            ) {
+            )
+            {
                 if (showButtons) {
                     item {
                         Column(
@@ -296,7 +325,7 @@ fun SmoothGradientBackground(
 
     Box(
         modifier = modifier
-            .fillMaxSize()
+
             .background(
                 Brush.linearGradient(
                     colors = gradientColors,
@@ -471,19 +500,19 @@ fun SmallHeader() {
 }
 
 
-
 @Composable
 fun ChatMessageItem(message: ChatMessage, timestamp: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 6.dp),
         horizontalAlignment = if (message.isUser) Alignment.End else Alignment.Start
     ) {
+        // Timestamp and avatar
         if (!message.isUser) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+                modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)
             ) {
                 Image(
                     painter = painterResource(R.drawable.logo128x128),
@@ -492,48 +521,89 @@ fun ChatMessageItem(message: ChatMessage, timestamp: String) {
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "BOT $timestamp",
+                    text = "BOT • $timestamp",
                     color = Color.Gray,
                     fontSize = 12.sp
                 )
             }
         } else {
             Text(
-                text = "You $timestamp",
+                text = "You • $timestamp",
                 color = Color.Gray,
                 fontSize = 12.sp,
                 modifier = Modifier
-                    .padding(end = 10.dp, bottom = 4.dp)
+                    .padding(end = 12.dp, bottom = 4.dp)
                     .align(Alignment.End)
             )
         }
 
-        Box(
-            modifier = Modifier
-                .widthIn(max = 325.dp)
-                .background(
-                    color = if (message.isUser) sapPrimary else sapAssistantBg,
-                    shape = RoundedCornerShape(12.dp)
+        // Message bubble
+        if (message.isUser) {
+            SmoothGradientBackground(
+                modifier = Modifier
+                    .widthIn(max = 325.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(1.dp, Color.Transparent, RoundedCornerShape(14.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = message.text,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        lineHeight = 22.sp
+                    )
+                }
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .widthIn(max = 325.dp)
+                    .background(
+                        color = botBubbleColor,
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color(0xFFB6D0E2),
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = message.text,
+                    color = botTextColor,
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp
                 )
-                .border(
-                    width = 1.dp,
-                    color = if (message.isUser) sapPrimary else Color(0xFFC4DBF5),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            Text(
-                text = message.text,
-                color = if (message.isUser) Color.White else sapUserText,
-                fontSize = 16.sp,
-                lineHeight = 22.sp
-            )
+            }
         }
     }
 }
 
+
+
+
 @Composable
 fun SAPTypingIndicator() {
+    val dotCount = 3
+    val dotSize = 8.dp
+    val dotSpacing = 4.dp
+    val delayPerDot = 300
+    val infiniteTransition = rememberInfiniteTransition()
+    val alphas = List(dotCount) { index ->
+        infiniteTransition.animateFloat(
+            initialValue = 0.3f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 600, delayMillis = delayPerDot * index),
+                repeatMode = RepeatMode.Reverse
+            )
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -548,35 +618,37 @@ fun SAPTypingIndicator() {
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        repeat(3) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(sapPrimary, shape = CircleShape)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
+        // Dots with animated alpha
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(dotSpacing)
+        ) {
+            alphas.forEach { alpha ->
+                Box(
+                    modifier = Modifier
+                        .size(dotSize)
+                        .graphicsLayer { this.alpha = alpha.value }
+                        .background(sapPrimary, shape = CircleShape)
+                )
+            }
         }
     }
 }
 
+
 fun getCurrentTime(): String {
-    val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
-    return sdf.format(Date())
+    val dateFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
+    return dateFormat.format(Date())
 }
+
 
 data class ChatMessage(val text: String, val isUser: Boolean)
 
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    val geminiHelper=GeminiHelper()
-    ChatScreen(geminiHelper)
-}
+
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview1() {
     val geminiHelper=GeminiHelper()
-    SmallHeader()
+    ChatMessageItem(ChatMessage("hello",true),"1233")
 }
 

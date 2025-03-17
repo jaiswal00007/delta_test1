@@ -17,3 +17,7 @@ val color1 = Color(0xFF2196F3) // Strong Blue
 val color2 = Color(0xFF2196F3) // Deep Purple
 val color3 = Color(0xFF00BCD4) // Cyan
 val color4 = Color(0xFF9C27B0) // Pink Accent
+val botBubbleColor = Color(0xFFE6F0FF)      // Soft light blue
+val botTextColor = Color(0xFF1A1A1A)        // Dark gray
+val userBubbleColor = Color(0xFF0066CC)     // Deep blue
+val userTextColor = Color.White
