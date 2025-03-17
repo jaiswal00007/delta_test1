@@ -20,16 +20,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -59,6 +66,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
@@ -71,7 +79,10 @@ import com.example.delta.ui.theme.color4
 import com.example.delta.ui.theme.sapAssistantBg
 import com.example.delta.ui.theme.sapPrimary
 import com.example.delta.ui.theme.sapUserText
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -98,7 +109,6 @@ class MainActivity : ComponentActivity() {
 
 
 }
-
 @Composable
 fun ChatScreen(geminiHelper: GeminiHelper) {
     var messages by remember { mutableStateOf(listOf<Pair<ChatMessage, String>>()) }
@@ -106,9 +116,8 @@ fun ChatScreen(geminiHelper: GeminiHelper) {
     var isTyping by remember { mutableStateOf(false) }
     var isFirstMessage by remember { mutableStateOf(true) }
     val keyboardController = LocalSoftwareKeyboardController.current
-    var showButtons by remember { mutableStateOf(true) }  // State to control visibility of buttons
+    var showButtons by remember { mutableStateOf(true) }
 
-    // Reusable send message function
     fun sendMessage(message: String) {
         if (message.isNotEmpty()) {
             val timestamp = getCurrentTime()
@@ -117,11 +126,8 @@ fun ChatScreen(geminiHelper: GeminiHelper) {
             isTyping = true
             isFirstMessage = false
             keyboardController?.hide()
-
-            // Hide buttons after first message
             showButtons = false
 
-            // Call Gemini API to get a response
             geminiHelper.getGeminiResponse(message) { response ->
                 Log.d("ChatScreen", "Gemini response received: $response")
                 val botTimestamp = getCurrentTime()
@@ -131,69 +137,69 @@ fun ChatScreen(geminiHelper: GeminiHelper) {
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(sapAssistantBg)
+            .imePadding()
+            .navigationBarsPadding()
     ) {
-
-        // **Conditional Header**
-        if (isFirstMessage) {
-            LargeHeader()
-        }
-        else{
-            SmallHeader()
-        }
-
-        // **New Button Below Topbar**
-        if (showButtons) {  // Only show the buttons if showButtons is true
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp), // Add space between the buttons
-                verticalAlignment = Alignment.CenterVertically // Vertically align the buttons in the center
-            ) {
-                Button(
-                    onClick = { sendMessage("Hi Delta") }, // Send "Hi Delta" when clicked
-                    modifier = Modifier
-                        .width(150.dp) // Adjust the width
-                        .padding(horizontal = 6.dp, vertical = 8.dp)
-                        .clip(RoundedCornerShape(12.dp)) // Border radius
-                        .shadow(
-                            elevation = 8.dp,
-                            shape = RoundedCornerShape(12.dp),
-                            ambientColor = Color.Black.copy(alpha = 0.1f),
-                            spotColor = Color.Black.copy(alpha = 0.5f)
-                        ), // Adds shadow with light intensity
-                    colors = ButtonDefaults.buttonColors(containerColor = sapAssistantBg)
-                ) {
-                    Text("Hi Delta", color = sapPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-
-                Button(
-                    onClick = { sendMessage("Today's Weather?") }, // Send "Today's Weather?" when clicked
-                    modifier = Modifier
-                        .width(200.dp) // Adjust the width
-                        .padding(horizontal = 6.dp, vertical = 8.dp)
-                        .clip(RoundedCornerShape(12.dp)) // Border radius
-                        .shadow(
-                            elevation = 8.dp,
-                            shape = RoundedCornerShape(12.dp),
-                            ambientColor = Color.Black.copy(alpha = 0.1f),
-                            spotColor = Color.Black.copy(alpha = 0.5f)
-                        ), // Adds shadow with light intensity
-                    colors = ButtonDefaults.buttonColors(containerColor = sapAssistantBg)
-                ) {
-                    Text("Today's Weather?", color = sapPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        // **Chat Messages**
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            LazyColumn {
+            if (isFirstMessage) {
+                LargeHeader()
+            } else {
+                SmallHeader()
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                reverseLayout = false
+            ) {
+                if (showButtons) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .padding(vertical = 12.dp)
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Button(
+                                    onClick = { sendMessage("Hi Delta") },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+                                ) {
+                                    Text("👋 Hi Delta", color = sapPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
+                                    onClick = { sendMessage("Today's Weather?") },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+                                ) {
+                                    Text("☀️ Weather", color = sapPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 items(messages) { (message, timestamp) ->
                     ChatMessageItem(message = message, timestamp = timestamp)
                 }
@@ -201,21 +207,23 @@ fun ChatScreen(geminiHelper: GeminiHelper) {
                     item { SAPTypingIndicator() }
                 }
             }
+
+            Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // **Input Field**
         Surface(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(8.dp),
             shadowElevation = 4.dp,
             shape = RoundedCornerShape(24.dp)
         ) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .background(Color.White)
-                    .padding(horizontal = 12.dp)
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
                     value = currentMessage,
@@ -232,7 +240,7 @@ fun ChatScreen(geminiHelper: GeminiHelper) {
                     ),
                     trailingIcon = {
                         IconButton(
-                            onClick = { sendMessage(currentMessage) }, // Send message when clicked
+                            onClick = { sendMessage(currentMessage) },
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
@@ -244,28 +252,24 @@ fun ChatScreen(geminiHelper: GeminiHelper) {
                         }
                     },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { sendMessage(currentMessage) }) // Send message on enter
+                    keyboardActions = KeyboardActions(onSend = { sendMessage(currentMessage) })
                 )
             }
         }
     }
 
-    // **Simulate AI Response**
     LaunchedEffect(isTyping) {
         if (isTyping) {
-            delay(1500) // Wait for simulated response
-
-            // Check if no response was added yet (API call might have failed)
+            delay(2000)
             if (messages.lastOrNull()?.first?.isUser == true) {
                 val timestamp = getCurrentTime()
                 messages = messages + (ChatMessage("Sorry, I couldn't fetch a response.", false) to timestamp)
             }
-
             isTyping = false
         }
     }
-
 }
+
 @Composable
 fun SmoothGradientBackground(
     modifier: Modifier = Modifier,
@@ -284,10 +288,10 @@ fun SmoothGradientBackground(
     )
 
     val gradientColors = listOf(
-        Color(0xFF2196F3), // Dominant Blue
-        Color(0xFF2196F3), // Extra Blue
-        Color(0xFF00BCD4), // Teal Accent
-        Color(0xFF9C27B0)  // Pink/Purple at far end
+        color1, // Dominant Blue
+        color2, // Extra Blue
+        color3, // Teal Accent  
+        color4  // Pink/Purple at far end
     )
 
     Box(
@@ -307,77 +311,166 @@ fun SmoothGradientBackground(
 
 
 
-
 @Composable
 fun LargeHeader() {
+
     SmoothGradientBackground(
         modifier = Modifier
             .fillMaxWidth()
             .height(600.dp)
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
         ) {
-            Image(
-                painter = painterResource(R.drawable.logo),
-                contentDescription = "Delta Logo",
+            // Top Row Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(32.dp))
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Hey! How can I help you?",
-                color = Color.White,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 16.dp)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.logo128x128),
+                    contentDescription = "Logo",
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = "Delta",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    text = "Beta",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+                )
+            }
+
+            // Center Content
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Image(
+                    painter = painterResource(R.drawable.logo),
+                    contentDescription = "Delta Logo",
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(32.dp))
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TypingText(
+                    fullText = "Hey! How can I help you?",
+                    typingSpeed = 60L,
+                    loop = true,
+                    textStyle = TextStyle(
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                )
+            }
         }
     }
 }
 
 
 @Composable
+fun TypingText(
+    fullText: String,
+    typingSpeed: Long = 50L,
+    cursorBlinkSpeed: Int = 500,
+    loop: Boolean = false,
+    modifier: Modifier = Modifier,
+    textStyle: TextStyle = TextStyle(fontSize = 20.sp, color = Color.White)
+) {
+    var displayedText by remember { mutableStateOf("") }
+
+    // Typing effect
+    LaunchedEffect(fullText, loop) {
+        do {
+            displayedText = ""
+            for (char in fullText) {
+                displayedText += char
+                delay(typingSpeed)
+            }
+            if (loop) {
+                delay(1500L) // pause before restarting
+            }
+        } while (loop)
+    }
+
+    Text(
+        text = displayedText ,
+        modifier = modifier,
+        style = textStyle
+    )
+}
+
+
+
+@Composable
 fun SmallHeader() {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(60.dp)
-            .background(sapPrimary),
-        contentAlignment = Alignment.CenterStart
+            .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 16.dp)
+        SmoothGradientBackground(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp)
         ) {
-            Image(
-                painter = painterResource(R.drawable.logo128x128),
-                contentDescription = "Logo",
-                modifier = Modifier.size(32.dp)
-                    .clip(RoundedCornerShape(16.dp))
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 16.dp)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.logo128x128),
+                    contentDescription = "Logo",
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                )
 
+                Spacer(modifier = Modifier.width(8.dp))
 
-            Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Delta",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Text(
-                text = "Delta",
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                text = "Beta",
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 12.sp,
-                modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
-            )
+                Text(
+                    text = "Beta",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+                )
+            }
         }
     }
 }
+
+
 
 @Composable
 fun ChatMessageItem(message: ChatMessage, timestamp: String) {
