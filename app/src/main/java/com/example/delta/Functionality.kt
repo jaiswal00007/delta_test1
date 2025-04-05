@@ -96,6 +96,7 @@ class Functionality(private val context: Context) {
     // to make a call by name
     fun callContactByName(contactName: String) {
         // Check if permissions are granted
+
         if (ActivityCompat.checkSelfPermission(
                 context,
                 Manifest.permission.CALL_PHONE

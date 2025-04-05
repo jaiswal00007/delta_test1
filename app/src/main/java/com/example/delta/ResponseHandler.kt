@@ -9,7 +9,8 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 class ResponseHandler(private val context: Context) {
-    val functionality=Functionality(context)
+    val functionality = Functionality(context)
+    val ask_gemini = GeminiHelper()
     val greetResponses = listOf(
         "Hey there! 😊 How can I help you today?",
         "Hi! 👋 What can I do for you?",
@@ -44,8 +45,6 @@ class ResponseHandler(private val context: Context) {
         "Made possible thanks to the hard work of Anshu Jaiswal 💪",
         "Anshu Jaiswal developed me to assist you better every day 👨‍💻"
     )
-
-
 
 
     fun detectIntent(userInput: String): String {
@@ -85,13 +84,13 @@ class ResponseHandler(private val context: Context) {
                 "disable flashlight",
                 "flashlight off"
             ),
-            "greet" to listOf("hi", "hello", "hey", "wassup","hyy","hy","hii","hlo"),
+            "greet" to listOf("hi", "hello", "hey", "wassup", "hyy", "hy", "hii", "hlo"),
             "set_alarm" to listOf("set an alarm", "create an alarm", "schedule an alarm"),
             "stop_alarm" to listOf("stop alarm", "turn off alarm", "disable alarm"),
             "about_bot" to listOf("who are you", "what is your name", "introduce yourself"),
             "developed_by" to listOf(
                 "developed you", "created you", "about developer", "made this assistant",
-                "behind this ai", "built this assistant?", "who designed you", "who programmed you"
+                "behind this ai", "built this assistant?", "who designed you", "who programmed you", "made you"
             ),
             "about_bot" to listOf(
                 "who are you", "your name", "about yourself", "introduce yourself",
@@ -112,8 +111,8 @@ class ResponseHandler(private val context: Context) {
             "phone_control" to listOf(
                 "increase volume", "decrease volume", "mute the phone", "turn on do not disturb"
             ),
-            "calls_messages" to listOf(
-                "call", "send a message to John", "text dad saying I’ll be late"
+            "calls" to listOf(
+                "call", "call Dad", "call"
             ),
             "wifi_bluetooth" to listOf(
                 "turn on WiFi", "turn off WiFi", "enable Bluetooth", "disable Bluetooth"
@@ -121,12 +120,20 @@ class ResponseHandler(private val context: Context) {
             "device_status" to listOf(
                 "how much battery is left?",
                 "what's my battery percentage?",
-                "is my phone charging?"
+                "is my phone charging?",
+                "battery status?",
+                "tell me my battery level",
+                "do I need to charge my phone?",
+                "how much charge do I have?",
+                "battery percentage now?",
+                "is my battery low?",
+                "what’s my current battery status?",
+                "battery percentage"
             )
         )
         val lowerInput = userInput.lowercase()
         for ((intent, phrases) in commands) {
-            if (phrases.any { phrase -> lowerInput.contains(phrase) }) {
+            if (phrases.any { phrase -> "\\b${Regex.escape(phrase)}\\b".toRegex().containsMatchIn(lowerInput) }) {
                 return intent
             }
         }
@@ -134,7 +141,18 @@ class ResponseHandler(private val context: Context) {
 
     }
 
-    fun getResponse(query: String, callback: (String) -> Unit) {
+    fun classifyCallIntent(input: String): Pair<String, String?> {
+        val words = input.split(" ") // Split input into words
+        return if (words.size > 1) {
+            // Call with a name
+            Pair("call_with_name", words.drop(1).joinToString(" "))
+        } else {
+            // Just "call"
+            Pair("call_general", null)
+        }
+    }
+
+    fun getResponse(query: String, history: List<Map<String, String>>, callback: (String) -> Unit) {
         val currentIntent = detectIntent(query)
 
         if (currentIntent.isNotEmpty()) {
@@ -144,7 +162,8 @@ class ResponseHandler(private val context: Context) {
                 "greet" -> callback(greetResponses.random())
 
                 "youtube", "instagram", "whatsapp", "facebook", "twitter", "snapchat",
-                "spotify", "chrome", "gmail" -> {
+                "spotify", "chrome", "gmail"
+                    -> {
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(1500) // wait 1.5 seconds
                         functionality.open_app(currentIntent)
@@ -167,19 +186,61 @@ class ResponseHandler(private val context: Context) {
                         callback("Turning off the flashlight")
                     }
                 }
+
+                "weather" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        callback("Fetching weather data...")
+
+                    }
+
+                }
+
+                "device_status" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(1500);
+                        val batteryPercentage = functionality.getBatteryPercentage(context)
+                        if (batteryPercentage != -1) {
+                            callback("You have $batteryPercentage% battery left")
+                        } else {
+                            callback("Sorry, I couldn't fetch battery status")
+                        }
+
+                    }
+                }
+
+                "call" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        val (intent, name) = classifyCallIntent(query)
+                        if (intent != "call_with_name") {
+                            callback("Who to Call?")
+                        } else {
+                            if (functionality.getPhoneNumberFromContact("${name}") != null) {
+                                callback("Calling ${name}")
+                                delay(1500)
+                                functionality.callContactByName(name!!)
+                            } else {
+                                callback("Contact not found")
+                            }
+
+                        }
+                    }
+
+
+                }
+
                 "navigation" -> callback("Opening Google Maps")
                 "music_control" -> callback("Controlling music playback")
-                else -> callback("Sorry, I couldn't understand that.")
+
+                else -> ask_gemini.getGeminiResponse(query, history) { reply ->
+                    callback(reply)
+
+                }
             }
         } else {
             callback("Invalid Response")
         }
+
     }
-
-
-
-
-
 }
 //fun main(){
 //    val get=ResponseHandler()

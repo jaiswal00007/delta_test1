@@ -5,10 +5,8 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.animateColor
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -23,14 +21,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -47,8 +43,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,7 +61,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -72,9 +70,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.delta.ui.theme.botBubbleColor
 import com.example.delta.ui.theme.botTextColor
 import com.example.delta.ui.theme.color1
@@ -83,9 +83,7 @@ import com.example.delta.ui.theme.color3
 import com.example.delta.ui.theme.color4
 import com.example.delta.ui.theme.sapAssistantBg
 import com.example.delta.ui.theme.sapPrimary
-import com.example.delta.ui.theme.sapUserText
-import com.example.delta.ui.theme.userBubbleColor
-import com.example.delta.ui.theme.userTextColor
+import com.yourapp.delta.WeatherData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -102,12 +100,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
-        val response = ResponseHandler(this)
         super.onCreate(savedInstanceState)
+        val response = ResponseHandler(this)
+        val weatherFetcher = WeatherData(this)
         enableEdgeToEdge()
+
         setContent {
 
-            ChatScreen(geminiHelper,response)
+            ChatScreen(geminiHelper,response,weatherFetcher)
 
         }
 
@@ -117,8 +117,9 @@ class MainActivity : ComponentActivity() {
 
 
 }
+
 @Composable
-fun ChatScreen(geminiHelper: GeminiHelper, response: ResponseHandler) {
+fun ChatScreen(geminiHelper: GeminiHelper, response: ResponseHandler,weatherFetcher: WeatherData) {
     var messages by remember { mutableStateOf(listOf<Pair<ChatMessage, String>>()) }
     var currentMessage by remember { mutableStateOf("") }
     var isTyping by remember { mutableStateOf(false) }
@@ -142,16 +143,61 @@ fun ChatScreen(geminiHelper: GeminiHelper, response: ResponseHandler) {
             keyboardController?.hide()
             showButtons = false
 
-            response.getResponse(message) { botReply ->
-                val botTimestamp = getCurrentTime()
+            CoroutineScope(Dispatchers.Main).launch {
+                if (message.contains("weather", ignoreCase = true)) {
+                    weatherFetcher.fetchCurrentWeather { response ->
+                        if (response != null) {
+                            val city = response.name
+                            val temp = response.main.temp
+                            val desc = response.weather.firstOrNull()?.description ?: "N/A"
+                            val humidity = response.main.humidity
+                            val windSpeed = response.wind.speed
+                            val feelsLike = response.main.feels_like
+                            val iconCode = response.weather.firstOrNull()?.icon ?: "01d"
 
-                CoroutineScope(Dispatchers.Main).launch {
-                    delay(2000)
-                    messages = messages + (ChatMessage(botReply, false) to botTimestamp)
-                    isTyping = false
+                            val weatherMessage = ChatMessage(
+                                isUser = false,
+                                messageType = MessageType.WEATHER,
+                                weatherData = WeatherData(
+                                    city = city,
+                                    temperature = (Math.round(temp * 10f)) / 10f.toDouble(),
+                                    weatherDescription = desc,
+                                    humidity = humidity,
+                                    windSpeed = (Math.round(windSpeed * 10f)) / 10f.toDouble(),
+                                    feelsLike = (Math.round(feelsLike * 10f)) / 10f.toDouble(),
+                                    iconCode = iconCode
+                                )
+                            )
+
+                            CoroutineScope(Dispatchers.Main).launch {
+                                delay(2000)
+                                messages = messages + (weatherMessage to getCurrentTime())
+                                isTyping = false
+                            }
+                        } else {
+                            Log.e("Weather", "Failed to fetch weather.")
+                            val botReply = "Sorry, I couldn't fetch the weather information at the moment."
+                            messages = messages + (ChatMessage(botReply, false) to getCurrentTime())
+                            isTyping = false
+                        }
+                    }
+                } else {
+                    val historyForContext = messages.map { (msg, _) ->
+                        mapOf(
+                            "role" to if (msg.isUser) "user" else "assistant",
+                            "content" to msg.text
+                        )
+                    }.takeLast(10)
+                    response.getResponse(message, historyForContext) { botReply ->
+                        val botTimestamp = getCurrentTime()
+                        CoroutineScope(Dispatchers.Main).launch {
+                            delay(2000)
+                            messages = (messages + (ChatMessage(botReply, false) to botTimestamp)).takeLast(10)
+                            isTyping = false
+                        }
+                    }
                 }
             }
-
 
 
 
@@ -185,8 +231,9 @@ fun ChatScreen(geminiHelper: GeminiHelper, response: ResponseHandler) {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                reverseLayout = false
+                    .padding(horizontal = 16.dp)
+                .padding(bottom = 90.dp),
+            reverseLayout = false
             )
             {
                 if (showButtons) {
@@ -287,16 +334,6 @@ fun ChatScreen(geminiHelper: GeminiHelper, response: ResponseHandler) {
         }
     }
 
-    LaunchedEffect(isTyping) {
-        if (isTyping) {
-            delay(2000)
-            if (messages.lastOrNull()?.first?.isUser == true) {
-                val timestamp = getCurrentTime()
-                messages = messages + (ChatMessage("Sorry, I couldn't fetch a response.", false) to timestamp)
-            }
-            isTyping = false
-        }
-    }
 }
 
 @Composable
@@ -499,7 +536,6 @@ fun SmallHeader() {
     }
 }
 
-
 @Composable
 fun ChatMessageItem(message: ChatMessage, timestamp: String) {
     Column(
@@ -537,51 +573,62 @@ fun ChatMessageItem(message: ChatMessage, timestamp: String) {
             )
         }
 
-        // Message bubble
-        if (message.isUser) {
-            SmoothGradientBackground(
-                modifier = Modifier
-                    .widthIn(max = 325.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .border(1.dp, Color.Transparent, RoundedCornerShape(14.dp))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    Text(
-                        text = message.text,
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        lineHeight = 22.sp
-                    )
+        // Message bubble or custom content
+        when (message.messageType) {
+            MessageType.TEXT -> {
+                if (message.isUser) {
+                    SmoothGradientBackground(
+                        modifier = Modifier
+                            .widthIn(max = 325.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                    ) {
+                        Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                            Text(
+                                text = message.text,
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                lineHeight = 22.sp
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .widthIn(max = 325.dp)
+                            .background(
+                                color = botBubbleColor,
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            .border(1.dp, Color(0xFFB6D0E2), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = message.text,
+                            color = botTextColor,
+                            fontSize = 16.sp,
+                            lineHeight = 22.sp
+                        )
+                    }
                 }
             }
-        } else {
-            Box(
-                modifier = Modifier
-                    .widthIn(max = 325.dp)
-                    .background(
-                        color = botBubbleColor,
-                        shape = RoundedCornerShape(14.dp)
+
+            MessageType.WEATHER -> {
+                message.weatherData?.let {
+                    WeatherCard(
+                        city = it.city,
+                        temperature = it.temperature,
+                        weatherDescription = it.weatherDescription,
+                        humidity = it.humidity,
+                        windSpeed = it.windSpeed,
+                        feelsLike = it.feelsLike,
+                        iconCode = it.iconCode
                     )
-                    .border(
-                        width = 1.dp,
-                        color = Color(0xFFB6D0E2),
-                        shape = RoundedCornerShape(14.dp)
-                    )
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
-            ) {
-                Text(
-                    text = message.text,
-                    color = botTextColor,
-                    fontSize = 16.sp,
-                    lineHeight = 22.sp
-                )
+                }
             }
         }
     }
 }
+
 
 
 
@@ -614,6 +661,7 @@ fun SAPTypingIndicator() {
             painter = painterResource(R.drawable.logo128x128),
             contentDescription = "Typing",
             modifier = Modifier.size(20.dp)
+                .clip(RoundedCornerShape(10.dp))
         )
 
         Spacer(modifier = Modifier.width(8.dp))
@@ -640,15 +688,107 @@ fun getCurrentTime(): String {
     return dateFormat.format(Date())
 }
 
+@Composable
+fun WeatherCard(
+    city: String,
+    temperature: Double,
+    weatherDescription: String,
+    humidity: Int,
+    windSpeed: Double,
+    feelsLike: Double,
+    iconCode: String
+) {
+    val currentDate = SimpleDateFormat("EEE, MMM d • h:mm a", Locale.getDefault()).format(Date())
 
-data class ChatMessage(val text: String, val isUser: Boolean)
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFDAF2FF)),
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(20.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = city,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                color = color2
+            )
+
+            Text(
+                text = currentDate,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.DarkGray
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            AsyncImage(
+                model = "https://openweathermap.org/img/wn/${iconCode}@4x.png",
+                contentDescription = "Weather Icon",
+                modifier = Modifier.size(100.dp)
+            )
+
+            Text(
+                text = "$temperature°C",
+                fontSize = 38.sp,
+                fontWeight = FontWeight.Bold,
+                color = color2
+            )
+
+            Text(
+                text = weatherDescription.replaceFirstChar { it.uppercaseChar() },
+                fontSize = 18.sp,
+                color = Color.DarkGray,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                WeatherInfoItem("💧 Humidity", "$humidity%")
+                WeatherInfoItem("🌬 Wind", "$windSpeed m/s")
+                WeatherInfoItem("🌡 Feels like", "$feelsLike°C")
+            }
+        }
+    }
+}
+
+@Composable
+fun WeatherInfoItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = label, fontSize = 14.sp, color = Color.DarkGray)
+        Text(text = value, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.Black)
+    }
+}
+
+//data class ChatMessage(val text: String, val isUser: Boolean)
 
 
 
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview1() {
-    val geminiHelper=GeminiHelper()
-    ChatMessageItem(ChatMessage("hello",true),"1233")
+//    val geminiHelper=GeminiHelper()
+//    ChatMessageItem(ChatMessage("hello",true),"1233")
+//
+//    WeatherCard(
+//        city = "New York",
+//        temperature = 25.5,
+//        weatherDescription = "Sunny",
+//        humidity = 60,
+//        windSpeed = 5.0,
+//        feelsLike = 24.0,
+//        iconCode = "01d"
+//    )
+        SAPTypingIndicator()
+
 }
 
