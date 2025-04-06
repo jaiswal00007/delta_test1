@@ -114,9 +114,10 @@ class ResponseHandler(private val context: Context) {
             "calls" to listOf(
                 "call", "call Dad", "call"
             ),
-            "wifi_bluetooth" to listOf(
-                "turn on WiFi", "turn off WiFi", "enable Bluetooth", "disable Bluetooth"
-            ),
+            "wifi_on" to listOf("turn on wifi", "switch on wifi", "enable wifi", "wifi on"),
+            "wifi_off" to listOf("turn off wifi", "switch off wifi", "disable wifi", "wifi off"),
+            "bluetooth_on" to listOf("turn on bluetooth", "switch on bluetooth" , "bluetooth on", "enable bluetooth"),
+            "bluetooth_off" to listOf("turn off bluetooth", "switch off bluetooth", "bluetooth off", "disable bluetooth"),
             "device_status" to listOf(
                 "how much battery is left?",
                 "what's my battery percentage?",
@@ -226,6 +227,34 @@ class ResponseHandler(private val context: Context) {
                     }
 
 
+                }
+                "bluetooth_on" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(1500) // wait 1.5 seconds
+                        functionality.switchBluetooth(context, 1)
+                    }
+                    callback("Turning on bluetooth")
+                }
+                "bluetooth_off" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(1500) // wait 1.5 seconds
+                        functionality.switchBluetooth(context, 0)
+                    }
+                    callback("Turning off bluetooth")
+                }
+                "wifi_on" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(1500) // wait 1.5 seconds
+                        functionality.switchnWifi(context, 1)
+                    }
+                    callback("Turning on wifi")
+                }
+                "wifi_off" -> {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(1500) // wait 1.5 seconds
+                        functionality.switchnWifi(context, 0)
+                    }
+                    callback("Turning off wifi")
                 }
 
                 "navigation" -> callback("Opening Google Maps")

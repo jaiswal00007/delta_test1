@@ -181,6 +181,57 @@ class Functionality(private val context: Context) {
             context.startActivity(intent)
         }
     }
+    // to turn on/off Bluetooth
+    fun switchBluetooth(context: Context, switch: Int) {
+        val bluetoothAdapter: BluetoothAdapter? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+            bluetoothManager.adapter
+        } else {
+            BluetoothAdapter.getDefaultAdapter()
+        }
+
+        if (bluetoothAdapter == null) {
+            Toast.makeText(context, "Bluetooth not supported on this device", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        when (switch) {
+            1 -> {
+                if (!bluetoothAdapter.isEnabled) {
+                    bluetoothAdapter.enable()
+                    Toast.makeText(context, "Turning Bluetooth ON", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Bluetooth is already ON", Toast.LENGTH_SHORT).show()
+                }
+            }
+            0 -> {
+                if (bluetoothAdapter.isEnabled) {
+                    if (ActivityCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.BLUETOOTH_CONNECT
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        // TODO: Consider calling
+                        //    ActivityCompat#requestPermissions
+                        // here to request the missing permissions, and then overriding
+                        //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                        //                                          int[] grantResults)
+                        // to handle the case where the user grants the permission. See the documentation
+                        // for ActivityCompat#requestPermissions for more details.
+                        return
+                    }
+                    bluetoothAdapter.disable()
+                    Toast.makeText(context, "Turning Bluetooth OFF", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Bluetooth is already OFF", Toast.LENGTH_SHORT).show()
+                }
+            }
+            else -> {
+                Toast.makeText(context, "Invalid command", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     // to get battery percentage
     fun getBatteryPercentage(context: Context): Int {
         // Create an intent filter to listen for battery status updates
@@ -243,7 +294,6 @@ class Functionality(private val context: Context) {
             AudioManager.FLAG_SHOW_UI
         )
     }
-    // to turn on bluetooth
 
 }
 
