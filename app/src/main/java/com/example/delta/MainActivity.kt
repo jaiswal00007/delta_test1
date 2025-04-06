@@ -182,12 +182,15 @@ fun ChatScreen(geminiHelper: GeminiHelper, response: ResponseHandler,weatherFetc
                         }
                     }
                 } else {
-                    val historyForContext = messages.map { (msg, _) ->
-                        mapOf(
-                            "role" to if (msg.isUser) "user" else "assistant",
-                            "content" to msg.text
-                        )
-                    }.takeLast(10)
+                    val historyForContext = messages
+                        .filter { it.first.messageType == MessageType.TEXT } // Only text messages
+                        .map { (msg, _) ->
+                            mapOf(
+                                "role" to if (msg.isUser) "user" else "assistant",
+                                "content" to msg.text
+                            )
+                        }
+                        .takeLast(10)
                     response.getResponse(message, historyForContext) { botReply ->
                         val botTimestamp = getCurrentTime()
                         CoroutineScope(Dispatchers.Main).launch {
@@ -232,8 +235,8 @@ fun ChatScreen(geminiHelper: GeminiHelper, response: ResponseHandler,weatherFetc
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                .padding(bottom = 90.dp),
-            reverseLayout = false
+                    .padding(bottom = 90.dp),
+                reverseLayout = false
             )
             {
                 if (showButtons) {
@@ -356,7 +359,7 @@ fun SmoothGradientBackground(
     val gradientColors = listOf(
         color1, // Dominant Blue
         color2, // Extra Blue
-        color3, // Teal Accent  
+        color3, // Teal Accent
         color4  // Pink/Purple at far end
     )
 
@@ -788,7 +791,6 @@ fun GreetingPreview1() {
 //        feelsLike = 24.0,
 //        iconCode = "01d"
 //    )
-        SAPTypingIndicator()
+    SAPTypingIndicator()
 
 }
-

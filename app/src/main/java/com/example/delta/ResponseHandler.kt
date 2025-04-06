@@ -2,6 +2,7 @@ package com.example.delta
 
 import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -112,7 +113,7 @@ class ResponseHandler(private val context: Context) {
                 "increase volume", "decrease volume", "mute the phone", "turn on do not disturb"
             ),
             "calls" to listOf(
-                "call", "call Dad", "call"
+                "call", "call Dad"
             ),
             "wifi_on" to listOf("turn on wifi", "switch on wifi", "enable wifi", "wifi on"),
             "wifi_off" to listOf("turn off wifi", "switch off wifi", "disable wifi", "wifi off"),
@@ -155,7 +156,7 @@ class ResponseHandler(private val context: Context) {
 
     fun getResponse(query: String, history: List<Map<String, String>>, callback: (String) -> Unit) {
         val currentIntent = detectIntent(query)
-
+        var response=""
         if (currentIntent.isNotEmpty()) {
             when (currentIntent) {
                 "about_bot" -> callback(aboutBotResponses.random())
@@ -173,18 +174,18 @@ class ResponseHandler(private val context: Context) {
                 }
 
                 "flashlight_on" -> {
+                    callback("Turning on the flashlight")
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(1500) // wait 1.5 seconds
                         functionality.toggleFlashlight(true)
                     }
-                    callback("Turning on the flashlight")
                 }
 
                 "flashlight_off" -> {
+                    callback("Turning off the flashlight")
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(1500) // wait 1.5 seconds
                         functionality.toggleFlashlight(false)
-                        callback("Turning off the flashlight")
                     }
                 }
 
@@ -209,52 +210,48 @@ class ResponseHandler(private val context: Context) {
                     }
                 }
 
-                "call" -> {
+                "calls" -> {
                     CoroutineScope(Dispatchers.Main).launch {
-                        val (intent, name) = classifyCallIntent(query)
-                        if (intent != "call_with_name") {
-                            callback("Who to Call?")
-                        } else {
-                            if (functionality.getPhoneNumberFromContact("${name}") != null) {
-                                callback("Calling ${name}")
-                                delay(1500)
-                                functionality.callContactByName(name!!)
-                            } else {
-                                callback("Contact not found")
-                            }
-
-                        }
+                        response=functionality.callContactByName(query)
+                        callback(response)
+                        delay(2500)
+                        Toast.makeText( context, response, Toast.LENGTH_SHORT).show()
                     }
 
 
                 }
                 "bluetooth_on" -> {
-                    CoroutineScope(Dispatchers.Main).launch {
-                        delay(1500) // wait 1.5 seconds
-                        functionality.switchBluetooth(context, 1)
-                    }
                     callback("Turning on bluetooth")
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(2500) // wait 1.5 seconds
+                        response=functionality.switchBluetooth(context, 1)
+                        Toast.makeText( context, response, Toast.LENGTH_SHORT).show()
+                    }
+
                 }
                 "bluetooth_off" -> {
-                    CoroutineScope(Dispatchers.Main).launch {
-                        delay(1500) // wait 1.5 seconds
-                        functionality.switchBluetooth(context, 0)
-                    }
                     callback("Turning off bluetooth")
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(2500) // wait 1.5 seconds
+                        response=functionality.switchBluetooth(context, 0)
+                        Toast.makeText( context, response, Toast.LENGTH_SHORT).show()
+                    }
                 }
                 "wifi_on" -> {
-                    CoroutineScope(Dispatchers.Main).launch {
-                        delay(1500) // wait 1.5 seconds
-                        functionality.switchnWifi(context, 1)
-                    }
                     callback("Turning on wifi")
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(2500) // wait 2.5 seconds
+                        response = functionality.switchnWifi(context, 1)
+                        Toast.makeText( context, response, Toast.LENGTH_SHORT).show()
+                    }
                 }
                 "wifi_off" -> {
-                    CoroutineScope(Dispatchers.Main).launch {
-                        delay(1500) // wait 1.5 seconds
-                        functionality.switchnWifi(context, 0)
-                    }
                     callback("Turning off wifi")
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(2500) // wait 2.5 seconds
+                        response=functionality.switchnWifi(context, 0)
+                        Toast.makeText( context, response, Toast.LENGTH_SHORT).show()
+                    }
                 }
 
                 "navigation" -> callback("Opening Google Maps")

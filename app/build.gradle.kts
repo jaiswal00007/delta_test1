@@ -31,6 +31,11 @@ android {
                 "OPENWEATHER_API_KEY",
                 "\"${project.findProperty("OPENWEATHER_API_KEY") ?: "API_KEY_NOT_FOUND"}\""
             )
+            buildConfigField(
+                "String",
+                "STABILITY_API_KEY",
+                "\"${project.findProperty("STABILITY_API_KEY") ?: "API_KEY_NOT_FOUND"}\""
+            )
         }
         release {
             isMinifyEnabled = false
@@ -48,6 +53,11 @@ android {
                 "String",
                 "OPENWEATHER_API_KEY",
                 "\"${project.findProperty("OPENWEATHER_API_KEY") ?: "API_KEY_NOT_FOUND"}\""
+            )
+            buildConfigField(
+                "String",
+                "STABILITY_API_KEY",
+                "${project.findProperty("STABILITY_API_KEY") ?: "API_KEY_NOT_FOUND"}\""
             )
         }
     }
@@ -91,7 +101,5 @@ dependencies {
     implementation ("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation ("com.google.android.gms:play-services-location:21.0.1")
     implementation("io.coil-kt:coil-compose:2.4.0")
-
-
 
 }

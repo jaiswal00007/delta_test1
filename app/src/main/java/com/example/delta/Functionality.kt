@@ -25,6 +25,11 @@ import android.os.BatteryManager
 import android.provider.ContactsContract
 
 import androidx.core.app.ActivityCompat.startActivityForResult
+import android.provider.Settings
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 
 @Suppress("DEPRECATION")
@@ -92,41 +97,50 @@ class Functionality(private val context: Context) {
         }
 
     }
+    // extract name from text
+    fun extractContactName(input: String): String? {
+        val cleanedInput = input.lowercase().trim()
+        val pattern = Regex("call(?: (?:my )?(?:friend )?)?(.+)", RegexOption.IGNORE_CASE)
+
+        val match = pattern.find(cleanedInput)
+        return match?.groups?.get(1)?.value?.trim()?.replaceFirstChar { it.uppercase() }
+    }
 
     // to make a call by name
-    fun callContactByName(contactName: String) {
-        // Check if permissions are granted
+    fun callContactByName(str: String): String {
+        val contactName = extractContactName(str)
 
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.CALL_PHONE
-            ) != PackageManager.PERMISSION_GRANTED ||
-            ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.READ_CONTACTS
-            ) != PackageManager.PERMISSION_GRANTED
+        if (contactName.isNullOrBlank()) {
+            return "Could not extract contact name from the command."
+        }
+
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED ||
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED
         ) {
             ActivityCompat.requestPermissions(
                 context as Activity,
                 arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.CALL_PHONE),
                 1
             )
-            return
+            return "Permission not granted"
         }
 
-        // Get the phone number associated with the contact name
         val phoneNumber = getPhoneNumberFromContact(contactName)
 
-        if (phoneNumber != null) {
-            // Create the Intent to make the call
-            val intent = Intent(Intent.ACTION_CALL)
-            intent.data = Uri.parse("tel:$phoneNumber")
-            context.startActivity(intent)
+        return if (phoneNumber != null) {
+            // Delay and make the call in a coroutine
+            CoroutineScope(Dispatchers.Main).launch {
+                delay(3000)
+                val intent = Intent(Intent.ACTION_CALL)
+                intent.data = Uri.parse("tel:$phoneNumber")
+                context.startActivity(intent)
+            }
+            "Calling $contactName..."
         } else {
-            // Handle the case when no contact is found
-            println("Contact not found")
+            "Contact '$contactName' not found in your contacts."
         }
     }
+
 
     fun getPhoneNumberFromContact(contactName: String): String? {
         val contentResolver: ContentResolver = context.contentResolver
@@ -157,32 +171,36 @@ class Functionality(private val context: Context) {
     }
 
     // to turn on/off wifi
-    fun switchnWifi(context: Context, switch: Int) {
+    fun switchnWifi(context: Context, switch: Int): String {
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
             val wifiManager =
                 context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            if (switch == 1) {
+            return if (switch == 1) {
                 if (!wifiManager.isWifiEnabled) {
                     wifiManager.isWifiEnabled = true
-                    Toast.makeText(context, "Wi-Fi turned ON", Toast.LENGTH_SHORT).show()
+                    "Wi-Fi turned ON"
                 } else {
-                    Toast.makeText(context, "Wi-Fi is already ON", Toast.LENGTH_SHORT).show()
+                    "Wi-Fi is already ON"
                 }
             } else {
                 if (wifiManager.isWifiEnabled) {
                     wifiManager.isWifiEnabled = false
+                    "Wi-Fi turned OFF"
                 } else {
-                    Toast.makeText(context, "Wi-Fi is already OFF", Toast.LENGTH_SHORT).show()
+                    "Wi-Fi is already OFF"
                 }
             }
         } else {
-            // For Android 10 (API level 29) and above, request the user to turn on Wi-Fi in settings
             val intent = Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
+//            return "Cannot toggle Wi-Fi programmatically on Android 10+. Opening Wi-Fi settings..."
+            return  "Opening Wi-Fi settings. Please turn it manually."
         }
     }
+
     // to turn on/off Bluetooth
-    fun switchBluetooth(context: Context, switch: Int) {
+    fun switchBluetooth(context: Context, switch: Int): String {
         val bluetoothAdapter: BluetoothAdapter? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
             bluetoothManager.adapter
@@ -191,46 +209,58 @@ class Functionality(private val context: Context) {
         }
 
         if (bluetoothAdapter == null) {
-            Toast.makeText(context, "Bluetooth not supported on this device", Toast.LENGTH_SHORT).show()
-            return
+            return "Bluetooth is not available on this device"
         }
 
-        when (switch) {
+        // 🔐 Request BLUETOOTH_CONNECT permission if required (Android 12+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            if (context is Activity) {
+                ActivityCompat.requestPermissions(
+                    context,
+                    arrayOf(Manifest.permission.BLUETOOTH_CONNECT),
+                    1001
+                )
+                return "Requesting Bluetooth permission..."
+            } else {
+                return "Bluetooth permission not granted (not an Activity)"
+            }
+        }
+
+        return when (switch) {
             1 -> {
                 if (!bluetoothAdapter.isEnabled) {
                     bluetoothAdapter.enable()
-                    Toast.makeText(context, "Turning Bluetooth ON", Toast.LENGTH_SHORT).show()
+                    "Bluetooth turned ON"
                 } else {
-                    Toast.makeText(context, "Bluetooth is already ON", Toast.LENGTH_SHORT).show()
+                    "Bluetooth is already ON"
                 }
             }
+
             0 -> {
                 if (bluetoothAdapter.isEnabled) {
-                    if (ActivityCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.BLUETOOTH_CONNECT
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        // TODO: Consider calling
-                        //    ActivityCompat#requestPermissions
-                        // here to request the missing permissions, and then overriding
-                        //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                        //                                          int[] grantResults)
-                        // to handle the case where the user grants the permission. See the documentation
-                        // for ActivityCompat#requestPermissions for more details.
-                        return
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        // Android 13+ can't disable Bluetooth programmatically
+                        val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                        "Bluetooth can't be turned OFF automatically on Android 13+. Opening settings..."
+                    } else {
+                        bluetoothAdapter.disable()
+                        "Bluetooth turned OFF"
                     }
-                    bluetoothAdapter.disable()
-                    Toast.makeText(context, "Turning Bluetooth OFF", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "Bluetooth is already OFF", Toast.LENGTH_SHORT).show()
+                    "Bluetooth is already OFF"
                 }
             }
-            else -> {
-                Toast.makeText(context, "Invalid command", Toast.LENGTH_SHORT).show()
-            }
+
+            else -> "Invalid command"
         }
     }
+
+
+
 
     // to get battery percentage
     fun getBatteryPercentage(context: Context): Int {

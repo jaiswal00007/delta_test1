@@ -22,6 +22,7 @@ class WeatherData(private val context: Context) {
     private val apiKey = BuildConfig.OPENWEATHER_API_KEY// 🔐 Replace with your OpenWeatherMap API key
     private val baseUrl = "https://api.openweathermap.org/data/2.5/"
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+
     interface WeatherApi {
         @GET("weather")
         fun getCurrentWeather(
