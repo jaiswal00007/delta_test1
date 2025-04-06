@@ -19,9 +19,18 @@ android {
     }
 
     buildTypes {
+
         debug {
-            val apiKey = project.findProperty("GMS_API_KEY") as String? ?: "API_KEY_NOT_FOUND"
-            buildConfigField("String", "GEMINI_API_KEY", "\"$apiKey\"")
+            buildConfigField(
+                "String",
+                "GEMINI_API_KEY",
+                "\"${project.findProperty("GEMINI_API_KEY") ?: "API_KEY_NOT_FOUND"}\""
+            )
+            buildConfigField(
+                "String",
+                "OPENWEATHER_API_KEY",
+                "\"${project.findProperty("OPENWEATHER_API_KEY") ?: "API_KEY_NOT_FOUND"}\""
+            )
         }
         release {
             isMinifyEnabled = false
@@ -29,8 +38,17 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            val apiKey = project.findProperty("GMS_API_KEY") as String? ?: "API_KEY_NOT_FOUND"
-            buildConfigField("String", "GEMINI_API_KEY", "\"$apiKey\"")
+
+            buildConfigField(
+                "String",
+                "GEMINI_API_KEY",
+                "\"${project.findProperty("GEMINI_API_KEY") ?: "API_KEY_NOT_FOUND"}\""
+            )
+            buildConfigField(
+                "String",
+                "OPENWEATHER_API_KEY",
+                "\"${project.findProperty("OPENWEATHER_API_KEY") ?: "API_KEY_NOT_FOUND"}\""
+            )
         }
     }
 

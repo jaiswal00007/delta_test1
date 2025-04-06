@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
 import android.util.Log
+import com.example.delta.BuildConfig
 import com.example.delta.WeatherResponse
 import com.google.android.gms.location.LocationServices
 import retrofit2.Call
@@ -18,7 +19,7 @@ import retrofit2.http.Query
 
 class WeatherData(private val context: Context) {
 
-    private val apiKey = "72b299ed6212bed3dfbcebc6152b228c" // 🔐 Replace with your OpenWeatherMap API key
+    private val apiKey = BuildConfig.OPENWEATHER_API_KEY // 🔐 Replace with your OpenWeatherMap API key
     private val baseUrl = "https://api.openweathermap.org/data/2.5/"
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
 
